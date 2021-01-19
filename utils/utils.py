@@ -13,7 +13,7 @@ import shelve
 import pdb
 import os
 import errno
-
+import klepto
 import getpass
 
 ALIAS_FORMAT = "{TABLE} AS {ALIAS}"
@@ -778,3 +778,78 @@ def extract_values(obj, key):
     results = extract(obj, arr, key)
     return results
 
+def cached_execute_query(sql, user, db_host, port, pwd, db_name,
+        execution_cache_threshold, sql_cache_dir=None,
+        timeout=120000):
+    '''
+    @timeout:
+    @db_host: going to ignore it so default localhost is used.
+    executes the given sql on the DB, and caches the results in a
+    persistent store if it took longer than self.execution_cache_threshold.
+    '''
+    sql_cache = None
+    if sql_cache_dir is not None:
+        assert isinstance(sql_cache_dir, str)
+        sql_cache = klepto.archives.dir_archive(sql_cache_dir,
+                cached=True, serialized=True)
+
+    hashed_sql = deterministic_hash(sql)
+
+    # archive only considers the stuff stored in disk
+    if sql_cache is not None and hashed_sql in sql_cache.archive:
+        return sql_cache.archive[hashed_sql], False
+
+    start = time.time()
+
+    os_user = getpass.getuser()
+    # con = pg.connect(user=user, port=port,
+            # password=pwd, database=db_name)
+    con = pg.connect(user=user, host=db_host, port=port,
+            password=pwd, database=db_name)
+    cursor = con.cursor()
+    if timeout is not None:
+        cursor.execute("SET statement_timeout = {}".format(timeout))
+    try:
+        cursor.execute(sql)
+    except Exception as e:
+        # print("query failed to execute: ", sql)
+        # FIXME: better way to do this.
+        cursor.execute("ROLLBACK")
+        con.commit()
+        cursor.close()
+        con.close()
+        return None
+
+    exp_output = cursor.fetchall()
+    cursor.close()
+    con.close()
+    end = time.time()
+    if (end - start > execution_cache_threshold) \
+            and sql_cache is not None:
+        sql_cache.archive[hashed_sql] = exp_output
+    return exp_output
+
+MAX_JOINS = 16
+def set_cost_model(cursor, cost_model):
+    # makes things easier to understand
+    cursor.execute("SET geqo_threshold = {}".format(MAX_JOINS))
+    cursor.execute("SET join_collapse_limit = {}".format(MAX_JOINS))
+    cursor.execute("SET from_collapse_limit = {}".format(MAX_JOINS))
+
+    if cost_model == "cm1":
+        cursor.execute("SET max_parallel_workers = 0")
+        cursor.execute("SET max_parallel_workers_per_gather = 0")
+
+        cursor.execute("SET enable_material = off")
+
+        cursor.execute("SET enable_hashjoin = on")
+        cursor.execute("SET enable_mergejoin = on")
+        cursor.execute("SET enable_nestloop = on")
+
+        cursor.execute("SET enable_indexscan = {}".format("on"))
+        cursor.execute("SET enable_seqscan = {}".format("on"))
+        cursor.execute("SET enable_indexonlyscan = {}".format("on"))
+        cursor.execute("SET enable_bitmapscan = {}".format("on"))
+        cursor.execute("SET enable_tidscan = {}".format("on"))
+    else:
+        assert False, "{} cost model unknown".format(cost_model)

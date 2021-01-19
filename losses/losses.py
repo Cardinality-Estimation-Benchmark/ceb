@@ -1,7 +1,7 @@
 import numpy as np
 import pdb
 from losses.plan_losses import PPC, PlanCost
-from utils.utils import deterministic_hash
+from utils.utils import deterministic_hash,make_dir
 
 import multiprocessing as mp
 import random
@@ -150,23 +150,29 @@ that query. Order of queries in querues and preds should be the same.
                         true_cardinalities, est_cardinalities,
                         num_processes=num_processes,
                         pool=pool)
-    # debug code
-    # losses = costs - opt_costs
-    # print("num samples: ", len(losses))
-    # print("losses mean: ", np.mean(losses))
-    # print("costs mean: ", np.mean(costs))
-    # print("opt costs mean: ", np.mean(opt_costs))
 
-    # TODO: create log files etc. if appropriate kwargs passed in
-    for i, qrep in enumerate(queries):
-        sql_key = str(deterministic_hash(qrep["sql"]))
-        # TODO: save log files
-        # add_query_result_row(sql_key, samples_type,
-                # est_sqls[i], est_costs[i],
-                # losses[i],
-                # get_leading_hint(est_plans[i]),
-                # qrep["template_name"], cur_costs, costs,
-                # qrep["name"])
+    if result_dir is not None:
+        make_dir(result_dir)
+        costs_fn = result_dir + "/" + cost_model + "_ppc.csv"
+        if os.path.exists(costs_fn):
+            costs_df = pd.read_csv(costs_fn)
+        else:
+            columns = ["sql_key", "plan", "exec_sql", "cost"]
+            costs_df = pd.DataFrame(columns=columns)
+
+        cur_costs = defaultdict(list)
+
+        for i, qrep in enumerate(queries):
+            sql_key = str(deterministic_hash(qrep["sql"]))
+            cur_costs["sql_key"].append(sql_key)
+            cur_costs["plan"].append(plans[i])
+            cur_costs["exec_sql"].append(sqls[i])
+            cur_costs["cost"].append(costs[i])
+
+        cur_df = pd.DataFrame(cur_costs)
+        combined_df = pd.concat([costs_df, cur_df], ignore_index=True)
+        combined_df.to_csv(costs_fn, index=False)
+
     pool.close()
     return costs, opt_costs
 

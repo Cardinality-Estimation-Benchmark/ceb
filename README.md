@@ -78,9 +78,7 @@ After setting up the database, you should be able to use the scripts here by
 passing in the appropriate user, db_name, db_host, and ports to appropriate python
 function calls.
 
-#### Local Setup
-
-TODO. PostgreSQL + pg_hint_plan + link to postgres setup repo.
+#### Local Setup (TODO)
 
 ### Python Requirements
 
@@ -213,11 +211,51 @@ print("Plan-Cost is: {}, Best possible Plan-Cost:{}".format(
       np.round(plan_cost[0]), np.round(opt_plan_cost[0])))
 ```
 
+For evaluating postgres on all queries in CEB / or just from some templates,
+run:
+
+```bash
+python3 examples/evaluate_postgres_estimates.py --query_templates 1a,2a
+```
+
 ### Getting runtimes
+
+There are two steps to generating the runtimes; first, we generate the PPC, and
+the corresponding SQLs to execute. These SQL strings would be annotated with
+various pg_hint_plan hints to enforce join order, operator selection and index
+selection (see losses/plan_losses.py for details). These strings can be
+executed on PostgreSQL with pg_hint_plan loaded, but you may want to use a
+different setup for execution --- so other processes on the computer do not
+interfere with the execution times, and do things like clear the cache after
+every execution (cold start), or repeat each execution a few times etc.
+depending on your goals. Here, we provide a simple example to execute the
+SQLs, but note that this  does not clear caches, or take care about isolating
+the execution from other processes, so these timings won't be reliable.
+
+```bash
+# writes out the file results/cm1_ppc.csv with the sqls to execute
+python3 examples/evaluate_postgres_estimates.py --query_templates 3a --result_dir results
+
+# executes the sqls on PostgreSQL server, with the given credientials
+python3 losses/get_runtimes.py --port 5401 --user arthurfleck --pwd password
+--result_dir results
+```
+
+TODO: describe the setup used in the paper.
 
 ### Featurization (TODO)
 
-### Generating Queries (TODO)
+### Generating Queries
+
+Queries in CEB are generated based on templates. Example templates are in the
+directory /templates/. More details abotu the templating scheme, including the
+base SQL structure of the templates in the IMDb workload are given here
+[templates](/TEMPLATES.md). For generating queries from such a template, you
+can use:
+
+```bash
+python3 query_gen/gen_queries.py --query_output_dir qreps --template_dir ./templates/imdb/3a/ -n 10 --user arthurfleck --pwd password --db_name imdb --port 5432
+```
 
 ### Generating Cardinalities (TODO)
 
@@ -233,5 +271,5 @@ print("Plan-Cost is: {}, Best possible Plan-Cost:{}".format(
 
 ## Licence
 
-TODO: Figure this out.
-TODO: Add citation information.
+<!--TODO: Figure this out.-->
+<!--TODO: Add citation information.-->

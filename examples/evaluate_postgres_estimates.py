@@ -23,7 +23,6 @@ def main():
 
         # let's first select all the qfns we are going to load
         qfns = list(glob.glob(qdir+"/*.pkl"))
-        # qfns = qfns[0:num_per_template]
         all_qfns += qfns
 
     # some templates take significantly longer to compute postgres plan costs
@@ -36,13 +35,17 @@ def main():
         preds.append(ests)
 
     print("going to call ppc for {} queries".format(len(qreps)))
-    compute_postgres_plan_cost(qreps, preds, port=5401, num_processes=4)
-
+    compute_postgres_plan_cost(qreps, preds, port=args.port, num_processes=4,
+            result_dir = args.result_dir)
 
 def read_flags():
     parser = argparse.ArgumentParser()
     parser.add_argument("--query_dir", type=str, required=False,
             default="./queries/imdb/")
+    parser.add_argument("--port", type=int, required=False,
+            default=5432)
+    parser.add_argument("--result_dir", type=str, required=False,
+            default=None)
     parser.add_argument("--query_templates", type=str, required=False,
             default="all")
     return parser.parse_args()
