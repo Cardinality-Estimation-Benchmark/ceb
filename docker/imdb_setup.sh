@@ -1,6 +1,7 @@
 #!/bin/sh
 
 #createdb -U arthurfleck imdb
+sleep 5
 createdb -U $POSTGRES_USER imdb
 
 #wget -O /var/lib/postgresql/pg_imdb.tar cs.brandeis.edu/~rcmarcus/pg_imdb.tar
