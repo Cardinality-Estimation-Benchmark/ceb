@@ -1,5 +1,7 @@
 # Cardinality Estimation Benchmark
 
+<b> Deprecated </b>. Please go to the new [repository](https://github.com/learnedsystems/ceb) at https://github.com/learnedsystems/ceb --- to access the latest version of the CEB.
+
 ## Contents
   * [Setup](#setup)
       - [Workload](#workload)
